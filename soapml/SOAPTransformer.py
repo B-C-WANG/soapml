@@ -48,8 +48,7 @@ class SOAPTransformer():
         if isinstance(center_position, list):
             if not isinstance(center_position[0], list):
                 raise ValueError("Input center position must be a 2D array")
-        elif isinstance(center_position, np.array):
-            if len(center_position.shape != 2):
+        elif len(center_position.shape) != 2:
                 raise ValueError("Input center position must be a 2D array")
 
         sample = self.sample
@@ -79,15 +78,30 @@ class SOAPTransformer():
         atom_cases.extend(absent)
 
         string = ""
+        new_atom_coord = []
+        final_atom_type = []
         for atom in atom_cases:
+
             string += atom_index_trans_reverse[atom]
             _t = atom_type_number[atom]
+            # for atoms in atom case but not in dataset ....
             if _t == 0:  # that means absent
+                print("Absent atom: ",atom)
                 string += "1"
                 #  if a absent atom, set absent position -10,-10,-10
-                atom_coord = np.concatenate([atom_coord, np.array(absent_atom_default_position).reshape(-1, 3)], axis=0)
+                new_atom_coord .append(np.array(absent_atom_default_position).reshape(-1, 3))
+                final_atom_type.append(atom)
+                #atom_coord = np.concatenate([atom_coord, ], axis=0)
             else:
+                for i in range(sample.shape[0]):
+                    if int(sample[i][0]) == atom:
+                        new_atom_coord.append(sample[i][1:].reshape(-1, 3))
+                        final_atom_type.append(atom)
+
                 string += str(atom_type_number[atom])
+        atom_coord = np.concatenate(new_atom_coord)
+        print("Final atom_coord shape:",atom_coord.shape)
+        print("Final atom type: ",final_atom_type)
         molecule_name = string
         print(molecule_name)
         atoms = Atoms(molecule_name, positions=atom_coord)
