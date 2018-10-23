@@ -28,7 +28,7 @@ class SOAPTransformer():
 
 
 
-    def transform(self,coord_with_atom_case,center_position,absent_atom_default_position=None):
+    def transform(self,coord_with_atom_case,center_position,absent_atom_default_position=None,debug=False):
         '''
 
 
@@ -56,7 +56,8 @@ class SOAPTransformer():
 
         if absent_atom_default_position is None:
             absent_atom_default_position = np.array(center_position)[0,:] - np.array([10,10,10])
-            print("Absent atom default position not set, use %s" % absent_atom_default_position)
+            if debug:
+                print("Absent atom default position not set, use %s" % absent_atom_default_position)
         else:
             absent_atom_default_position = absent_atom_default_position
 
@@ -86,7 +87,8 @@ class SOAPTransformer():
             _t = atom_type_number[atom]
             # for atoms in atom case but not in dataset ....
             if _t == 0:  # that means absent
-                print("Absent atom: ",atom)
+                if debug:
+                    print("Absent atom: ",atom)
                 string += "1"
                 #  if a absent atom, set absent position -10,-10,-10
                 new_atom_coord .append(np.array(absent_atom_default_position).reshape(-1, 3))
@@ -100,10 +102,12 @@ class SOAPTransformer():
 
                 string += str(atom_type_number[atom])
         atom_coord = np.concatenate(new_atom_coord)
-        print("Final atom_coord shape:",atom_coord.shape)
-        print("Final atom type: ",final_atom_type)
+        if debug:
+            print("Final atom_coord shape:",atom_coord.shape)
+            print("Final atom type: ",final_atom_type)
         molecule_name = string
-        print(molecule_name)
+        if debug:
+            print(molecule_name)
         atoms = Atoms(molecule_name, positions=atom_coord)
 
         hpos = [
