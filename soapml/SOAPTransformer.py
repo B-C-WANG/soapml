@@ -1,6 +1,6 @@
 
 from VDE.AtomSpace import  atom_index_trans_reverse
-from soaplite import getBasisFunc, get_soap_locals
+from soaplite import getBasisFunc, get_soap_locals, get_periodic_soap_locals
 from ase import Atoms
 import numpy as np
 from collections import Counter
@@ -19,6 +19,11 @@ class SOAPTransformer():
            then will set to [-10,-10,-10] to center_position,
            test shows that in that range, feature of the absent atom will be zero vector
 
+           n_max, l_max : related to the basis number in soaplite, set it bigger will get larger vector
+
+
+
+
            '''
         self.n_max = n_max
         self.l_max = l_max
@@ -28,7 +33,7 @@ class SOAPTransformer():
 
 
 
-    def transform(self,coord_with_atom_case,center_position,absent_atom_default_position=None,debug=False):
+    def transform(self,coord_with_atom_case,center_position,absent_atom_default_position=None,debug=False,periodic=False,cell_info=None):
         '''
 
 
@@ -38,8 +43,21 @@ class SOAPTransformer():
            center_position: the position we are interested, will calculate
            the local chemical environment in that position
 
-        :return:
+            absent_default_position: if the atom of atom case not in dataset, will set to default_position
+            if it is None, set position to [-10,-10,-10]  of center postition
+
+            periodic: True if data have a periodic structure
+            then cell info, a 3x3 array, should offer,
+            this data can be found in POSCAR, if from VASP result
+
+
+
+
         '''
+        #print("If met bug with set_cell, see doc in ase.Atom.set_cell")
+        if periodic == True and cell_info is None:
+            raise ValueError("Should give cell info if use periodic")
+
 
         self.sample = coord_with_atom_case
         assert self.sample.shape[1] == 4
@@ -109,6 +127,9 @@ class SOAPTransformer():
         if debug:
             print(molecule_name)
         atoms = Atoms(molecule_name, positions=atom_coord)
+        if periodic == True:
+            atoms.set_cell(cell_info)
+
 
         hpos = [
             center_position
@@ -119,16 +140,26 @@ class SOAPTransformer():
         r_cut = self.r_cut
         my_alphas, my_betas = getBasisFunc(r_cut, n_max)
 
-        x = get_soap_locals(
-            atoms,
-            hpos,
-            my_alphas,
-            my_betas,
-            rCut=r_cut,
-            NradBas=n_max,
-            Lmax=l_max,
-            crossOver=True
-        )
+        if periodic == False:
+            x = get_soap_locals(
+                atoms,
+                hpos,
+                my_alphas,
+                my_betas,
+                rCut=r_cut,
+                NradBas=n_max,
+                Lmax=l_max,
+                crossOver=True
+            )
+        else:
+            x = get_periodic_soap_locals(atoms,
+                hpos,
+                my_alphas,
+                my_betas,
+                rCut=r_cut,
+                NradBas=n_max,
+                Lmax=l_max,
+                crossOver=True)
 
         return x
 

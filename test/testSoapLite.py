@@ -1,4 +1,4 @@
-from soaplite import getBasisFunc, get_soap_locals
+from soaplite import getBasisFunc, get_soap_locals, get_periodic_soap_structure,get_periodic_soap_locals,get_soap_structure
 from ase import Atoms
 from ase.build import molecule
 #-------------- Define structure -----------------------------------------------
@@ -37,6 +37,38 @@ x = get_soap_locals(
     crossOver=True
 )
 
+xs = get_soap_structure(atoms,
+
+    my_alphas,
+    my_betas,
+    rCut=r_cut,
+    NradBas=n_max,
+    Lmax=l_max,
+    crossOver=True)
+# xps = get_periodic_soap_structure(atoms,
+#
+#     my_alphas,
+#     my_betas,
+#     rCut=r_cut,
+#     NradBas=n_max,
+#     Lmax=l_max,
+#     crossOver=True)
+# xp = get_periodic_soap_locals(atoms,
+#     hpos,
+#     my_alphas,
+#     my_betas,
+#     rCut=r_cut,
+#     NradBas=n_max,
+#     Lmax=l_max,
+#     crossOver=True)
+
 print(x)
 print(x.shape)
+
+print(xs)
+print(xs.shape)
+print(xp)
+print(xp.shape)
+print(xps)
+print(xps.shape)
 # output shape (num_position, feature_num)
