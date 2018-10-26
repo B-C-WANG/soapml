@@ -131,9 +131,8 @@ class SOAPTransformer():
             atoms.set_cell(cell_info)
 
 
-        hpos = [
-            center_position
-        ]
+        hpos = center_position
+
 
         n_max = self.n_max
         l_max = self.l_max
