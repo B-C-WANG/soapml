@@ -1,19 +1,36 @@
 from VDE.VASPMoleculeFeature import  VASP_DataExtract
+from soapml.SOAPTransformer import  SOAPTransformer
 import pandas as pd
 import numpy as np
-
+import pickle as pkl
+import tqdm
 
 
 
 class Dataset(object):
+    '''
+    we will use all steps in a Vasp dir, rather than final one
 
-    def __init__(self,coord,energy,box_tensor=None):
+
+
+    '''
+
+    def __init__(self,coord,energy,box_tensor=None,description=""):
+
+
         self.coord = coord
         self.energy = energy
         self.box_tensor = box_tensor
+        self.description = description
+        self.repeat_count = 0
+        self.repeated = False
+
+
+
+
 
     @staticmethod
-    def from_vasp_dir_and_energy_table(vasp_dir_table):
+    def from_vasp_dir_and_energy_table(vasp_dir_table,descriprion=""):
         '''
         give a .xlsx/.csv file name, content is like:
         Vasp Dirs | slab energy
@@ -35,30 +52,37 @@ class Dataset(object):
             slab_energy = data["slab energy"]
         except KeyError:
             raise ValueError("Input table must contain Vasp Dirs and slab energy, use generate_vasp_dir_energy_table to get one correct table.")
+        return Dataset.from_vasp_dir_and_energy_list(vasp_dirs,slab_energy,descriprion)
+
+    @staticmethod
+    def from_vasp_dir_and_energy_list(vasp_dirs,slab_energy,description=""):
+
+
         coordinate = []
         energy = []
         box_tensor = []
-
-        for i in range(len(vasp_dirs)):
+        print("\nNow extracting data from Vasp ... ")
+        for i in tqdm.trange(len(vasp_dirs)):
             vasp_dir = vasp_dirs[i]
             vde = VASP_DataExtract(vasp_dir)
             coord,_,_ = vde.get_output_as_atom3Dspace().generate_data()
             e = vde.get_energy_info()
+            vde.get_box_tensor_and_type_info()
             _box_tensor = vde.box_tensor_info
             _t = []
             for j in range(len(e)):
                 _t.append(e[j+1])
             e = _t
             coordinate.append(coord)
-            energy.append(np.array(e)-float(slab_energy))
+            energy.append(np.array(e)-float(slab_energy[i]))
             box_tensor.append(_box_tensor)
-        return Dataset(coordinate,energy,box_tensor)
+        return Dataset(coordinate,energy,box_tensor,description)
 
 
 
 
     @staticmethod
-    def from_coordinate_and_energy_array(coordinate,energy,box_tensor=None):
+    def from_coordinate_and_energy_array(coordinate,energy,box_tensor=None,description=""):
         '''
         e.g.
         (two group, first group contains two sample, each sample is two H
@@ -88,8 +112,6 @@ class Dataset(object):
         (energy of two groups)
 
         box_tensor: a 3x3 matrix, contain cell param
-
-
         '''
 
         error_info_coord = "Coordinate must be a LIST of ARRAY ARRAY which every array has shape (n_samples, n_atoms, 4), 4 is atom_index, x, y, z."
@@ -109,7 +131,7 @@ class Dataset(object):
             c_shape = coordinate[i].shape
             e_shape = energy[i].shape
             assert c_shape[0] == e_shape[0], "In %sth sample, coordinate and energy num not match, which has %s %s"%(i,c_shape,e_shape)
-        return Dataset(coordinate,energy,box_tensor)
+        return Dataset(coordinate,energy,box_tensor,description)
 
     @staticmethod
     def generate_vasp_dir_energy_table(vasp_dir,to_csv=False):
@@ -137,9 +159,16 @@ class Dataset(object):
 
 
     def sample_filter(self,ratio=0.15):
+        '''
+        we think that first 15% sample of Vasp is not stable,
+        they have a big influence on model,
+        choose to keep or not
+
+        '''
         new_coord = []
         new_energy = []
-        for i in range(len(self.coord)):
+        print("\nNow filter samples ...")
+        for i in tqdm.trange(len(self.coord)):
             c = self.coord[i]
             e = self.energy[i]
             split_point = int(c.shape[0] * ratio)
@@ -150,6 +179,12 @@ class Dataset(object):
 
     def apply_period(self,direction,repeat_count=1):
         '''
+
+        for the original structure, the atom on the edge will
+        have a big difference to atom on the center
+        so we need to repeat the period structure
+
+
 
         all sample will apply one direction period
         but box_tensor can be different!
@@ -163,20 +198,31 @@ class Dataset(object):
         repeat_count:
         if 1: repeat once: add Vector * 1 and Vector * -1 to original coord
         if 2: add Vector * 2, 1, -1, -2 to original coord
+
+        e.g. Vector A is [0,1,0.5]
+        atom 1 is [0,0,0]
+        when repeat = 0
+
         '''
+        if repeat_count == 0:
+            return
+        else:
+            self.repeated = True
         self.repeated_coord = []
-        for i in range(len(self.coord)):
+        self.repeat_count = repeat_count # this param is need for predict!
+        print("\nNow applying period ...")
+        for i in tqdm.trange(len(self.coord)):
             c = self.coord[i]
             bt = self.box_tensor[i]
             # 0 represents atom cases add 0 to atom cases
-            change = np.array([0,bt[direction][0],bt[direction][1],bt[direction][2]])
+            change = np.array([0,bt[direction][0],bt[direction][1],bt[direction][2]]).astype("float32")
             repeat = list(range(-repeat_count,repeat_count+1))
             repeat.remove(0)
             repeat.insert(0,0)
 
             new_c = []
             for j in repeat:
-                offset = change * j
+                offset = change * float(j)
                 new_c.append(c+offset)
             new_c = np.concatenate(new_c,axis=1)
             self.repeated_coord.append(new_c)
@@ -187,42 +233,42 @@ class Dataset(object):
                                            r_cut=r_cut)
         x_feature = []
         y = []
-        for i in range(len(self.coord)):
+        print("\nNow soap encoding ...")
+        for i in tqdm.trange(len(self.coord)):
             for j in range(self.coord[i].shape[0]):
-                coord_ = self.coord[i][j,:,:]
+                if self.repeated:
+                    coord_ = self.repeated_coord[i][j,:,:]
+                else:
+                    coord_ = self.coord[i][j,:,:]
                 aim_atom_pos = []
                 for atom in center_atom_cases:
-                    aim_atom_pos.append(coord_[coord_[:,0]==atom])
+                    # use not repeated (center) coord
+                    c = self.coord[i][j,:,:]
+
+                    aim_atom_pos.append(c[c[:,0]==atom])
 
                 aim_atom_pos = np.concatenate(aim_atom_pos,axis=0)
                 center_pos = np.mean(aim_atom_pos,axis=0)[1:].reshape(1,-1)
                 x_feature.append(self.soap_transformer.transform(coord_,center_position=center_pos,periodic=False,absent_atom_default_position=absent_atom_default_position))
                 y.append(self.energy[i][j])
-        x = np.array(x_feature)
+        x = np.concatenate(x_feature,axis=0)
         y = np.array(y)
         self.datasetx = x
         self.datasety = y
 
+    def save(self,filename="dataset.smld"):
+        with open(filename, "wb") as f:
+            pkl.dump(self,f)
+
+    @staticmethod
+    def load(filename="dataset.smld"):
+        with open(filename,"rb") as f:
+            return pkl.load(f)
+
+    def __str__(self):
+        return self.description
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-    def coord_repeat(self,):
-        pass
 
 
 
@@ -262,10 +308,15 @@ def tst_from_coord_and_energy():
         ])
 
     ] * 2
-    dataset = Dataset.from_coordinate_and_energy_array(coordinate=coord,energy=energy,box_tensor=box_tensor)
+    dataset = Dataset.from_coordinate_and_energy_array(coordinate=coord,energy=energy,box_tensor=box_tensor,
+                                                       description="This is a example")
     assert isinstance(dataset, Dataset)
     dataset.apply_period(0, repeat_count=3)
     dataset.soap_encode(center_atom_cases=[1,2],encode_atom_cases=[1])
+    print(dataset.datasetx.shape)
+    print(dataset.datasety.shape)
+    dataset.save()
+    print(Dataset.load())
 
 
 if __name__ == '__main__':
