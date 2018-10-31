@@ -55,8 +55,19 @@ class Dataset(object):
         return Dataset.from_vasp_dir_and_energy_list(vasp_dirs,slab_energy,descriprion)
 
     @staticmethod
-    def from_vasp_dir_and_energy_list(vasp_dirs,slab_energy,description=""):
+    def from_vasp_dir_and_energy_list(vasp_dirs,slab_energy=None,final_ads_energy=None,description=""):
+        '''
 
+        if use slab energy, y will be energy of every step - slab energy
+        if use final_energy, y will be energy of every step - energy of final step + final energy
+
+
+        '''
+        assert slab_energy != None or final_ads_energy != None, "At least feed one reference energy"
+        if (slab_energy != None and final_ads_energy != None):
+            raise ValueError("Can only feed one type of energy!")
+        if slab_energy != None:use_slab_energy = True
+        else:use_slab_energy = False
 
         coordinate = []
         energy = []
@@ -74,7 +85,10 @@ class Dataset(object):
                 _t.append(e[j+1])
             e = _t
             coordinate.append(coord)
-            energy.append(np.array(e)-float(slab_energy[i]))
+            if use_slab_energy:
+                energy.append(np.array(e)-float(slab_energy[i]))
+            else:
+                energy.append(np.array(e)-float(e[-1]) + float(final_ads_energy[i]))
             box_tensor.append(_box_tensor)
         return Dataset(coordinate,energy,box_tensor,description)
 
@@ -234,7 +248,7 @@ class Dataset(object):
         x_feature = []
         y = []
         print("\nNow soap encoding ...")
-        for i in tqdm.trange(len(self.coord)):
+        for i in tqdm.trange(len(self.coord)): # TODO: use parallel python to speed up !
             for j in range(self.coord[i].shape[0]):
                 if self.repeated:
                     coord_ = self.repeated_coord[i][j,:,:]
