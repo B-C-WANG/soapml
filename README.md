@@ -1,3 +1,14 @@
+# soapml is under development
+## feature:
+
+### input contains many structure(of x y z or vasp dirs) and its adsorption energy, its recommended that you put many stucture of adsorbate+surface, and give energy of surface, since we will use energies of every structure rather than the most stable structure of adsorbate+surface, but energy of surface should be optimized.   
+###input in three ways: 
+
+- give a dir containing many vasp dirs, these dirs have surface structure and absorbates. for each dir, give out the energy without adsorbates(slab energy). e.g. dirs of OH on N doped carbon, OH on B doped carbon, and give slab energy of optimized N doped carbon and B doped carbon, you can use a script to generate table and fill the table with slab energy
+- give a dir contraining many vasp dirs, and corresponding slab vasp dir, e.g. give OH + N doped carbon dir, and give a slab N doped carbon dir. Programme will extract slab energy from the second dir to calculate adsorption energy of OH
+- give a array with shape （n_sample, 4)，contains samples with [atom_index, x, y, z]， and give absorption energy of every sample
+
+
 # soapml
 - get SOAP (Smooth Overlap of Atomic Positions) feature from [SOAPLite](https://github.com/SINGROUP/SOAPLite) and do machine learning
 
