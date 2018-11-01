@@ -15,22 +15,23 @@ class Dataset(object):
 
     '''
 
-    def __init__(self,coord,energy,box_tensor=None,description=""):
+    def __init__(self,coord,energy=None,box_tensor=None,only_x=False,description=""):
 
 
         self.coord = coord
         self.energy = energy
         self.box_tensor = box_tensor
         self.description = description
-        self.repeat_count = 0
+        self.repeat_config = []
         self.repeated = False
-
+        self.repeated_coord = None
+        self.only_x = only_x
 
 
 
 
     @staticmethod
-    def from_vasp_dir_and_energy_table(vasp_dir_table,descriprion=""):
+    def from_vasp_dir_and_energy_table(vasp_dir_table,only_x=False,description=""):
         '''
         give a .xlsx/.csv file name, content is like:
         Vasp Dirs | slab energy
@@ -48,14 +49,20 @@ class Dataset(object):
             raise ValueError(error_info)
 
         try:
-            vasp_dirs = data["Vasp Dirs"]
-            slab_energy = data["slab energy"]
+            if only_x == True:
+                vasp_dirs = data["Vasp Dirs"]
+                slab_energy = None
+                return Dataset.from_vasp_dir_and_energy_list(vasp_dirs, slab_energy, only_x=True,description=description)
+            else:
+                vasp_dirs = data["Vasp Dirs"]
+                slab_energy = data["slab energy"]
+                return Dataset.from_vasp_dir_and_energy_list(vasp_dirs, slab_energy, only_x=False,description=description)
         except KeyError:
             raise ValueError("Input table must contain Vasp Dirs and slab energy, use generate_vasp_dir_energy_table to get one correct table.")
-        return Dataset.from_vasp_dir_and_energy_list(vasp_dirs,slab_energy,descriprion)
+
 
     @staticmethod
-    def from_vasp_dir_and_energy_list(vasp_dirs,slab_energy=None,final_ads_energy=None,description=""):
+    def from_vasp_dir_and_energy_list(vasp_dirs,slab_energy=None,final_ads_energy=None,only_x=False,description=""):
         '''
 
         if use slab energy, y will be energy of every step - slab energy
@@ -63,11 +70,12 @@ class Dataset(object):
 
 
         '''
-        assert slab_energy != None or final_ads_energy != None, "At least feed one reference energy"
-        if (slab_energy != None and final_ads_energy != None):
-            raise ValueError("Can only feed one type of energy!")
-        if slab_energy != None:use_slab_energy = True
-        else:use_slab_energy = False
+        if only_x==False:
+            assert slab_energy != None or final_ads_energy != None, "At least feed one reference energy"
+            if (slab_energy != None and final_ads_energy != None):
+                raise ValueError("Can only feed one type of energy!")
+            if slab_energy != None:use_slab_energy = True
+            else:use_slab_energy = False
 
         coordinate = []
         energy = []
@@ -85,18 +93,23 @@ class Dataset(object):
                 _t.append(e[j+1])
             e = _t
             coordinate.append(coord)
-            if use_slab_energy:
-                energy.append(np.array(e)-float(slab_energy[i]))
-            else:
-                energy.append(np.array(e)-float(e[-1]) + float(final_ads_energy[i]))
+            if only_x == False:
+                if use_slab_energy:
+                    energy.append(np.array(e)-float(slab_energy[i]))
+                else:
+                    energy.append(np.array(e)-float(e[-1]) + float(final_ads_energy[i]))
             box_tensor.append(_box_tensor)
-        return Dataset(coordinate,energy,box_tensor,description)
+        if only_x == True:
+            return Dataset(coordinate,energy,box_tensor,only_x=True,description=description)
+
+        else:
+            return Dataset(coordinate,energy,box_tensor,only_x=False,description=description)
 
 
 
 
     @staticmethod
-    def from_coordinate_and_energy_array(coordinate,energy,box_tensor=None,description=""):
+    def from_coordinate_and_energy_array(coordinate,energy=None,box_tensor=None,only_x=False,description=""):
         '''
         e.g.
         (two group, first group contains two sample, each sample is two H
@@ -131,10 +144,11 @@ class Dataset(object):
         error_info_coord = "Coordinate must be a LIST of ARRAY ARRAY which every array has shape (n_samples, n_atoms, 4), 4 is atom_index, x, y, z."
         error_info_energy = "Energy must be a LIST of ARRAY which every array has shape (n_samples, 1), every n_samples MUST be same as n_samples in coordinate"
         assert  isinstance(coordinate,list),error_info_coord
-        assert  isinstance(energy, list),error_info_energy
+        if only_x == False:assert  isinstance(energy, list),error_info_energy
         assert isinstance(coordinate[0],np.ndarray), error_info_coord
-        assert isinstance(energy[0], np.ndarray), error_info_energy
-        assert len(coordinate) == len(energy), "Coordinate num should equal to energy num"
+        if only_x == False:
+            assert isinstance(energy[0], np.ndarray), error_info_energy
+            assert len(coordinate) == len(energy), "Coordinate num should equal to energy num"
         if box_tensor is not None:
             assert isinstance(box_tensor, list) , "Box tensor must be a List of 3x3 array, "
             assert len(box_tensor) == len(coordinate) == len(energy), "Coordinate, energy and box_tensor list should be with same length"
@@ -143,9 +157,13 @@ class Dataset(object):
                 energy), "Coordinate and energy list should be with same length"
         for i in range(len(coordinate)):
             c_shape = coordinate[i].shape
-            e_shape = energy[i].shape
-            assert c_shape[0] == e_shape[0], "In %sth sample, coordinate and energy num not match, which has %s %s"%(i,c_shape,e_shape)
-        return Dataset(coordinate,energy,box_tensor,description)
+            if only_x == False:
+                e_shape = energy[i].shape
+                assert c_shape[0] == e_shape[0], "In %sth sample, coordinate and energy num not match, which has %s %s"%(i,c_shape,e_shape)
+        if only_x == True:
+            return Dataset(coordinate,energy,box_tensor,only_x=True,description=description)
+        else:
+            return Dataset(coordinate,energy,box_tensor,only_x=False,description=description)
 
     @staticmethod
     def generate_vasp_dir_energy_table(vasp_dir,to_csv=False):
@@ -184,10 +202,11 @@ class Dataset(object):
         print("\nNow filter samples ...")
         for i in tqdm.trange(len(self.coord)):
             c = self.coord[i]
-            e = self.energy[i]
             split_point = int(c.shape[0] * ratio)
             new_coord.append(c[split_point:,:,:])
-            new_energy.append(e[split_point:])
+            if self.only_x == False:
+                e = self.energy[i]
+                new_energy.append(e[split_point:])
         self.coord = new_coord
         self.energy = new_energy
 
@@ -222,11 +241,16 @@ class Dataset(object):
             return
         else:
             self.repeated = True
-        self.repeated_coord = []
-        self.repeat_count = repeat_count # this param is need for predict!
+        if self.repeated_coord == None:
+            self.repeated_coord = []
+            coord = self.coord
+        else:
+            coord = self.repeated_coord
+            self.repeated_coord = []
+        self.repeat_config.append([direction,repeat_count]) # this param is need for predict!
         print("\nNow applying period ...")
-        for i in tqdm.trange(len(self.coord)):
-            c = self.coord[i]
+        for i in tqdm.trange(len(coord)):
+            c = coord[i]
             bt = self.box_tensor[i]
             # 0 represents atom cases add 0 to atom cases
             change = np.array([0,bt[direction][0],bt[direction][1],bt[direction][2]]).astype("float32")
@@ -264,7 +288,8 @@ class Dataset(object):
                 aim_atom_pos = np.concatenate(aim_atom_pos,axis=0)
                 center_pos = np.mean(aim_atom_pos,axis=0)[1:].reshape(1,-1)
                 x_feature.append(self.soap_transformer.transform(coord_,center_position=center_pos,periodic=False,absent_atom_default_position=absent_atom_default_position))
-                y.append(self.energy[i][j])
+                if self.only_x == False:
+                    y.append(self.energy[i][j])
         x = np.concatenate(x_feature,axis=0)
         y = np.array(y)
         self.datasetx = x

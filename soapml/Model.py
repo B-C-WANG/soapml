@@ -1,13 +1,14 @@
 from soapml.Dataset import Dataset
 from MLT.Regression.GBR_FeatureImportanceEstimater import GBRFIE
-
+import pickle as pkl
+import numpy as np
 class Model():
     def __init__(self,dataset):
         assert  isinstance(dataset,Dataset), "Input must be soapml.Dataset"
         self.x = dataset.datasetx
         self.y = dataset.datasety
         self.description = dataset.description
-        self.repeat_count = dataset.repeat_count
+        self.repeat_config = dataset.repeat_config
         self.box_tensor = dataset.box_tensor
 
     def keep_data_larger_than(self,y):
@@ -40,11 +41,14 @@ class Model():
         self.y = y
 
 
-    def fit_gbr(self,test_split_ratio=0.3,n_estimators=1000):
-        self.model = GBRFIE(self.x,self.y,test_split_ratio=test_split_ratio)
+    def fit_gbr(self,test_split_ratio=0.3,n_estimators=1000,shuffle=True):
+        self.model = GBRFIE(self.x,self.y,test_split_ratio=test_split_ratio,shuffle=shuffle)
         self.model.fit(n_estimators)
         self.error = self.model.show_pred_train_test(plot_fig=True)
         print("Got error: %s"%self.error)
+
+    def __model_predict(self,x):
+        return self.model.model.predict(x)
 
     def __str__(self):
         string = self.description

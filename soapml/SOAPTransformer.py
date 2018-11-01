@@ -7,7 +7,7 @@ from collections import Counter
 
 class SOAPTransformer():
     def __init__(self,encode_atom_cases,
-                 n_max=5,l_max=5,r_cut=10.0):
+                 n_max=8,l_max=8,r_cut=15.0):
         '''
 
 
@@ -73,7 +73,7 @@ class SOAPTransformer():
         needed_atom_cases = self.needed_atom_cases
 
         if absent_atom_default_position is None:
-            absent_atom_default_position = np.array(center_position)[0,:] - np.array([10,10,10])
+            absent_atom_default_position = np.array(center_position)[0,:] - np.array([30,30,30])
             if debug:
                 print("Absent atom default position not set, use %s" % absent_atom_default_position)
         else:
