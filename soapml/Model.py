@@ -10,6 +10,7 @@ class Model():
         self.description = dataset.description
         self.repeat_config = dataset.repeat_config
         self.box_tensor = dataset.box_tensor
+        self.model = None
 
     def keep_data_larger_than(self,y):
         def condition(data):
@@ -39,6 +40,15 @@ class Model():
         y = new_dataset[:, -1]
         self.x = x
         self.y = y
+
+    def encode_before_predict(self,dataset):
+        '''
+        encode dataset before predict
+
+
+        dataset can contain y or not
+
+        '''
 
 
     def fit_gbr(self,test_split_ratio=0.3,n_estimators=1000,shuffle=True):

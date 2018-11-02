@@ -33,7 +33,7 @@ class SOAPTransformer():
 
 
 
-    def transform(self,coord_with_atom_case,center_position,absent_atom_default_position=None,debug=False,periodic=False,cell_info=None):
+    def transform(self,coord_with_atom_case,center_position,absent_atom_default_position=None,relative_absent_position=False,debug=False,periodic=False,cell_info=None):
         '''
 
 
@@ -73,11 +73,15 @@ class SOAPTransformer():
         needed_atom_cases = self.needed_atom_cases
 
         if absent_atom_default_position is None:
-            absent_atom_default_position = np.array(center_position)[0,:] - np.array([30,30,30])
+            absent_atom_default_position = np.array(center_position)[0,:] - np.array([10,10,10]) # don't know why this is important set (10,10,10) is better than (30,30,30)
             if debug:
                 print("Absent atom default position not set, use %s" % absent_atom_default_position)
         else:
-            absent_atom_default_position = absent_atom_default_position
+            if relative_absent_position == False:
+                absent_atom_default_position = absent_atom_default_position
+            else:
+                absent_atom_default_position = np.array(center_position)[0,:] - np.array(absent_atom_default_position)
+
 
         # sort atom types to match the sort of ase atom name
         sample = np.sort(sample, axis=0)
