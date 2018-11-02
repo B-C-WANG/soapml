@@ -265,7 +265,13 @@ class Dataset(object):
             new_c = np.concatenate(new_c,axis=1)
             self.repeated_coord.append(new_c)
 
-    def soap_encode(self,center_atom_cases,encode_atom_cases,n_max=8,l_max=8,r_cut=15.0,absent_atom_default_position=None):
+    def soap_encode(self,center_atom_cases,encode_atom_cases,n_max=8,l_max=8,r_cut=15.0,absent_atom_default_position=[10,10,10],relative_absent_position=True):
+        self.encode_atom_cases = encode_atom_cases
+        self.n_max = n_max
+        self.l_max = l_max
+        self.r_cut = r_cut
+        self.absent_atom_default_position = absent_atom_default_position
+        self.relative_absent_position= relative_absent_position
 
         self.soap_transformer = SOAPTransformer(encode_atom_cases=encode_atom_cases, n_max=n_max, l_max=l_max,
                                            r_cut=r_cut)
@@ -287,7 +293,10 @@ class Dataset(object):
 
                 aim_atom_pos = np.concatenate(aim_atom_pos,axis=0)
                 center_pos = np.mean(aim_atom_pos,axis=0)[1:].reshape(1,-1)
-                x_feature.append(self.soap_transformer.transform(coord_,center_position=center_pos,periodic=False,absent_atom_default_position=absent_atom_default_position))
+                x_feature.append(self.soap_transformer.transform(coord_,center_position=center_pos,
+                                                                 periodic=False,
+                                                                 absent_atom_default_position=absent_atom_default_position,
+                                                                 relative_absent_position=relative_absent_position))
                 if self.only_x == False:
                     y.append(self.energy[i][j])
         x = np.concatenate(x_feature,axis=0)
