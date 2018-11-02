@@ -2,6 +2,12 @@
 
 ## **soapml**
 
+{% hint style="info" %}
+**\#TODO：除了函数调用，也要给出Dataset和Model的不同类型的Demo，比如训练，测试和生产环境使用的代码，以及用不同的输入创建Dataset，尽可能完善用例**
+
+**\#TODO： 完成Model.Predict的内容**
+{% endhint %}
+
 soapml is based on SOAPLite: [https://github.com/SINGROUP/SOAPLite](https://github.com/SINGROUP/SOAPLite)
 
 A machine learning tool for doing regression using SOAP \(smooth overlap of atomic position\) encoded structure of molecules, surface, ... Helps to find relationship between position and energy, activity and other physical chemical property.
@@ -55,6 +61,8 @@ _**Example:**  We have a background structure Pt\(111\) surface as slab, and we 
 
 _**You can make your input by soapml.Dataset,**_ soapml needs structure \(atom index and x y z coordinate\) and energy as input. It is now supported for **VASP results dir** \(the dir containing OUTCAR, CONTCAR, OUT.ANI of VASP\), and directly use **structure array list and energy array list**_**.**_ You can write something in param "description" to help you remember what the dataset is. _**You can use one of following method to make your input, they all return an instance of Dataset, and if you want to make only dataset of X \(when do prediction, you need to make dataset contains only X\), you need to give only\_x = True.**_
 
+_**——————————**_
+
 ### 1. @static - Dataset.from\_vasp\_dir\_and\_energy\_table
 
 _**\(vasp\_dir\_table, only\_x, description\)**_
@@ -68,6 +76,8 @@ First, give a dir containing many vasp dirs, these dirs have slab + ads structur
 | Pt\_OH3 | 3.5 |
 
 Then use **@static - Dataset.from\_vasp\_dir\_and\_energy\_table\(vasp\_dir\_table,description\)** and set vasp\_dir\_table to the excel or csv filename.
+
+_**——————————**_
 
 ### **2. @static - Dataset.from\_vasp\_dir\_and\_energy\_list**
 
@@ -89,6 +99,8 @@ Regression target _Et_ will be: _**energy of every step - energy of final step +
 _**Example:**_ _If we have vasp\_dirs: \[Pt\_OH01, Pt\_OH02\], we can offer slab\_energy like \[-100.0, -102.0\], and the energy of Pt\_OH01, like \[-99.8, -98.7, -96.5\], will be used to be subtracted by -100 to get target energy \[0.02, 1.3, 3.5\], and the energy of Pt\_OH02, like \[-90, -89\], will get \[12, 21\]. But if we offer final\_ads\_energy like \[1.1, 2.1\], for energy on Pt\_OH01, target energy will be -99.8 - \(-96.5\) + 1.1 = -2.1, in this way, we got target energy \[-2.1, -1.2, 1.1\], and target energy on Pt\_OH02 is \[1.1, 2.1\]._
 {% endhint %}
 
+_**——————————**_
+
 ### 3. @static - Dataset.from\_coordinate\_and\_energy\_array
 
 _**\(coordinate, energy, box\_tensor,  only\_x, description\)**_
@@ -105,6 +117,8 @@ _Box\_tensor can be directly extract from POSCAR in vasp or Material Studio._
 
 _**When you finished your input, you will get an instance of Dataset as return, and now you need following functions to do SOAP transform to prepare x and y for machine learning:**_
 
+_**——————————**_
+
 ### 4. Dataset.sample\_filter
 
 _**\(ratio\)**_
@@ -114,6 +128,8 @@ Take ratio = 0.15 for example, the first 15 % of samples in each sample group wi
 {% hint style="info" %}
 _People often use the sample from a vasp structure optimization process rather than dataset designed for machine learning, so there will be some strange structure at the beginning._
 {% endhint %}
+
+_**——————————**_
 
 ### 5. Dataset.apply\_period
 
@@ -130,6 +146,8 @@ _**When do we need to apply period? If the position we interested is very closed
 
 ![Fig2 Repeat along one direction](.gitbook/assets/fig2.png)
 {% endhint %}
+
+_**——————————**_
 
 ### 6. Dataset.soap\_encode
 
@@ -167,11 +185,15 @@ _**For example, we have OH\* on three different carbon nanotube, C, B and N. C a
 Usually we should set the position of absent atom as far away from center position as possible, and the default value is \[-10,-10,-10\] off the center position. _**But in my case, set \[-10, -10, -10\] got a much better result than set to \[-30, -30, -30\], don't know why this happen.**_
 {% endhint %}
 
+_**——————————**_
+
 ### 7. Dataset.save
 
 _**\(filename\)**_
 
 Dataset will be saved to soapmlDataset file \(.smld\) using pickle. **It's highly recommended to save your dataset and load it before train a machine learning model, since it takes to much time to do SOAP encoding.**
+
+_**——————————**_
 
 ### **8. @static - Dataset.load**
 
@@ -181,7 +203,7 @@ Load dataset instance from the soapmlDataset file \(.smld\).
 
 ## How to use soapml? -- Use dataset to do machine learning
 
-_**use soapml.Model and give a soapml.Dataset to train model, test model and save model. There are 3 stages to use soapml.Model, and their process are:**_
+_**use soapml.Model and give a soapml.Dataset to train model, test model and save model. There are 4 stages to use soapml.Model, and their process are:**_
 
 {% tabs %}
 {% tab title="train/test" %}
@@ -197,18 +219,22 @@ _**use soapml.Model and give a soapml.Dataset to train model, test model and sav
 {% endtab %}
 
 {% tab title="use" %}
-1. _**Make a Dataset containing only X, and set only\_x = True, do not encode.**_
+1. _**Make a Dataset containing only X, and this X must be a list of array \(Vasp results dir input is not supported -- since you have done using vasp, you need not to do soapml\)**_
 2. _**Load a trained model from Model.Load**_
 3. _**Use Model.encode\_before\_predict to give the dataset and encode with the same config as in train process**_
-4. _**Run Model.predict and offer the encode Dataset, will return Y**_
+4. _**Run Model.predict and offer the encode Dataset, and this time you have other ways to make center position.**_
 {% endtab %}
 {% endtabs %}
 
-### 1. @init - Model
+_**——————————**_
+
+### 1. Model.init
 
 _**\(dataset\)**_
 
 _**You need to offer a soapml.Dataset to create model. You can feed a dataset with both X and Y or only X \(remember to set only\_x = True\).**_ 
+
+_**——————————**_
 
 ### 2. Model.keep\_data\_larger\_than & Model.keep\_data\_smaller\_than
 
@@ -219,6 +245,8 @@ Keep data that have y larger/smaller than a threshold_**.**_
 {% hint style="info" %}
 _**Example:**_ _We have samples which mainly is in range -10 to -6, but there are some sample are -20, so we can use **keep\_data\_larger\_than\(-11\)** to delete samples with smaller than -11 energy._
 {% endhint %}
+
+_**——————————**_
 
 ### 3. Model.fit\_gbr
 
@@ -231,6 +259,8 @@ _**Shuffle or not shuffle?** Take a real case of carbon nanotube for example, if
 
 _**And if we choose not to shuffle, we need to decide what is our trainset and what is testset.**_
 {% endhint %}
+
+_**——————————**_
 
 ### **4. Model.predict**
 
@@ -245,11 +275,15 @@ _**And if we choose not to shuffle, we need to decide what is our trainset and w
 \#TODO: give a dataset or coordinate, center position, ... to encode and predict energy
 {% endhint %}
 
+_**——————————**_
+
 ### 5. Model.save
 
 _**\(filename\)**_
 
 Model will be saved to soapmlModel file \(.smlm\) using pickle. Save and keep your model well, one day it will be useful.
+
+_**——————————**_
 
 ### **6. @static - Model.load**
 
@@ -257,7 +291,7 @@ _**\(filename\)**_
 
 Load model instance from the soapmlModel file \(.smlm\).
 
-## Example - SOAP "Probe"
+## Advance Example - SOAP "Probe"
 
 * prepare a surface and an adsorbate \(e.g. H\) as "Probe".
 * get energy of surface without probe Es, move probe on the surface, get energy list Ep\_l. \(from DFT calculation...\)
