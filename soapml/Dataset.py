@@ -4,6 +4,7 @@ import pandas as pd
 import numpy as np
 import pickle as pkl
 import tqdm
+import warnings
 
 
 
@@ -210,6 +211,27 @@ class Dataset(object):
         self.coord = new_coord
         self.energy = new_energy
 
+    def give_a_sample_from_dataset(self,sample_group_index,sample_index,use_repeated=True):
+        if self.repeated_coord == True and use_repeated== True:
+            return self.repeated_coord[sample_group_index][sample_index,:,:]
+        else:
+            if use_repeated == True:
+                warnings.warn("Haven't apply period, can not export repeated structure.")
+            return self.coord[sample_group_index][sample_index,:,:]
+
+    @staticmethod
+    def from_slab_and_center_position(slab_structure, center_position,box_tensor=None):
+        slab_error_info = "Input slab should be an array of (n_atoms, 4), but shape is %s"
+        center_position_info = "Input center_position should be an array of (n, 3), but shape is %s"
+
+        assert len(slab_structure.shape) == 2 and slab_structure.shape[1] == 4, slab_error_info % (slab_structure.shape)
+        assert len(center_position.shape) == 2 and center_position.shape[1] == 3, center_position_info % (
+            center_position.shape)
+
+        slab_structure = [slab_structure.reshape(1,slab_structure.shape[0],slab_structure.shape[1])]
+
+        return Dataset(coord=slab_structure,box_tensor=box_tensor,only_x=True)
+
     def apply_period(self,direction,repeat_count=1):
         '''
 
@@ -241,7 +263,7 @@ class Dataset(object):
             return
         else:
             self.repeated = True
-        if self.repeated_coord == None:
+        if self.repeated_coord is None:
             self.repeated_coord = []
             coord = self.coord
         else:
@@ -251,6 +273,9 @@ class Dataset(object):
         print("\nNow applying period ...")
         for i in tqdm.trange(len(coord)):
             c = coord[i]
+
+            if len(c.shape) == 2:
+                c = c.reshape(1, c.shape[0], c.shape[1])
             bt = self.box_tensor[i]
             # 0 represents atom cases add 0 to atom cases
             change = np.array([0,bt[direction][0],bt[direction][1],bt[direction][2]]).astype("float32")
@@ -263,9 +288,18 @@ class Dataset(object):
                 offset = change * float(j)
                 new_c.append(c+offset)
             new_c = np.concatenate(new_c,axis=1)
+
+
             self.repeated_coord.append(new_c)
 
-    def soap_encode(self,center_atom_cases,encode_atom_cases,n_max=8,l_max=8,r_cut=15.0,absent_atom_default_position=[10,10,10],relative_absent_position=True):
+
+
+    def soap_encode(self,encode_atom_cases,center_atom_cases=None,center_position=None,n_max=8,l_max=8,r_cut=15.0,absent_atom_default_position=[10,10,10],relative_absent_position=True):
+
+        if center_atom_cases is None and center_position is None:
+            raise ValueError("At least set one of center_atom_cases, center_position")
+        if center_position is not None and center_atom_cases is not None:
+            raise ValueError("Can not set Both center_atom_cases and center_position, what do you want to do?")
         self.encode_atom_cases = encode_atom_cases
         self.n_max = n_max
         self.l_max = l_max
@@ -278,21 +312,29 @@ class Dataset(object):
         x_feature = []
         y = []
         print("\nNow soap encoding ...")
+
         for i in tqdm.trange(len(self.coord)): # TODO: use parallel python to speed up !
+
             for j in range(self.coord[i].shape[0]):
                 if self.repeated:
+
                     coord_ = self.repeated_coord[i][j,:,:]
                 else:
                     coord_ = self.coord[i][j,:,:]
-                aim_atom_pos = []
-                for atom in center_atom_cases:
-                    # use not repeated (center) coord
-                    c = self.coord[i][j,:,:]
 
-                    aim_atom_pos.append(c[c[:,0]==atom])
 
-                aim_atom_pos = np.concatenate(aim_atom_pos,axis=0)
-                center_pos = np.mean(aim_atom_pos,axis=0)[1:].reshape(1,-1)
+                if center_position is None:
+                    aim_atom_pos = []
+                    for atom in center_atom_cases:
+                        # use not repeated (center) coord
+                        c = self.coord[i][j, :, :]
+
+                        aim_atom_pos.append(c[c[:, 0] == atom])
+
+                    aim_atom_pos = np.concatenate(aim_atom_pos, axis=0)
+                    center_pos = np.mean(aim_atom_pos,axis=0)[1:].reshape(1,-1)
+                else:
+                    center_pos = center_position
                 x_feature.append(self.soap_transformer.transform(coord_,center_position=center_pos,
                                                                  periodic=False,
                                                                  absent_atom_default_position=absent_atom_default_position,

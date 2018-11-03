@@ -1,6 +1,7 @@
 from soapml.Dataset import Dataset
 from MLT.Regression.GBR_FeatureImportanceEstimater import GBRFIE
 import pickle as pkl
+import matplotlib.pyplot as plt
 import numpy as np
 class Model():
     def __init__(self,dataset):
@@ -11,6 +12,13 @@ class Model():
         self.repeat_config = dataset.repeat_config
         self.box_tensor = dataset.box_tensor
         self.model = None
+        self.transformer = dataset.soap_transformer
+        self.encode_atom_cases = dataset.encode_atom_cases
+        self.n_max = dataset.n_max
+        self.l_max = dataset.l_max
+        self.r_cut = dataset.r_cut
+        self.absent_atom_default_position = dataset.absent_atom_default_position
+        self.relative_absent_position = dataset.relative_absent_position
 
     def keep_data_larger_than(self,y):
         def condition(data):
@@ -41,14 +49,62 @@ class Model():
         self.x = x
         self.y = y
 
-    def encode_before_predict(self,dataset):
+    @staticmethod
+    def make_grid(
+                  x_res,
+                  y_res,
+                  z_res,
+                  x_max,
+            x_min,
+            y_max,
+            y_min,
+            z_max,
+            z_min
+                  ):
+        pass
+
+
+
+
+    def encode(self,dataset,center_atom_cases=None,center_position=None,sample_filter_ratio=0):
         '''
-        encode dataset before predict
-
-
+        encode the same way as the dataset in Model(Dataset)
+        the information of encoding of trainset have passed from
+        dataset into Model
         dataset can contain y or not
-
         '''
+        assert isinstance(dataset, Dataset)
+        if sample_filter_ratio >= 0.001:
+            dataset.sample_filter(ratio=sample_filter_ratio)
+        if len(self.repeat_config) >= 1:
+            for i in self.repeat_config:
+                dataset.apply_period(i[0],i[1])
+
+        dataset.soap_encode(center_atom_cases=center_atom_cases,
+            center_position=center_position,
+                            encode_atom_cases=self.encode_atom_cases,
+                            absent_atom_default_position=self.absent_atom_default_position,
+                            relative_absent_position=self.relative_absent_position)
+        return dataset
+
+    def predict_and_validate(self,dataset):
+        x=dataset.datasetx
+        true_y = dataset.datasety
+        pred_y = self.model.model.predict(x)
+
+
+
+        plt.scatter(pred_y, true_y)
+        plt.show()
+
+        error = np.mean(np.abs(pred_y - true_y))
+
+        print("Validate error: ",error)
+
+
+
+
+
 
 
     def fit_gbr(self,test_split_ratio=0.3,n_estimators=1000,shuffle=True):
