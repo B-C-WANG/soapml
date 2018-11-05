@@ -1,40 +1,41 @@
 # README
 
-**Read this document on gitbook:** [**https://wangbch.gitbook.io/soapml-document/**](https://wangbch.gitbook.io/soapml-document/)\*\*\*\*
+## _**Please Read this document on gitbook:**_ [_**https://wangbch.gitbook.io/soapml-document/**_](https://wangbch.gitbook.io/soapml-document/)_\*\*\*\*_
 
 ## **soapml**
-
-{% hint style="info" %}
-**\#TODO：除了函数调用，也要给出Dataset和Model的不同类型的Demo，比如训练，测试和生产环境使用的代码，以及用不同的输入创建Dataset，尽可能完善用例**
-
-**\#TODO： 完成Model.Predict的内容**
-{% endhint %}
 
 soapml is based on SOAPLite: [https://github.com/SINGROUP/SOAPLite](https://github.com/SINGROUP/SOAPLite)
 
 A machine learning tool for doing regression using SOAP \(smooth overlap of atomic position\) encoded structure of molecules, surface, ... Helps to find relationship between position and energy, activity and other physical chemical property.
 
-## Demo
+## Demo 
+
+### Train & Test
 
 ```python
 # prepare data
 data = ...
+# a vasp_file_path, list of string, like ["\public\Pt_OH1","\public\Pt_OH2"]
 vasp_file_path, y = data
+# make dataset
 dataset = Dataset.from_vasp_dir_and_energy_list(vasp_file_path,final_ads_energy=y,
                                                     description="""
                                                     the carbon nanotube data,
                                                     doped with N or B,
                                                     adsorbate: OH
                                                     """)
-    
+# delete first 15% sample in each vasp dir (a vasp dir is a sample group)
 dataset.sample_filter(ratio=0.15)
+# apply period on VectorC, it is Z direction in this case, repeat +Z, 0 and -Z
 dataset.apply_period(direction=2,repeat_count=1)
 dataset.soap_encode(center_atom_cases=[8],encode_atom_cases=[5,6,7])
+# save for loading later
 dataset.save("dataset.smld")
 
 # do machine learning
 dataset = Dataset.load("dataset.smld")
 model = Model(dataset)
+# use gradient boost regression
 model.fit_gbr(n_estimators=200,shuffle=True,test_split_ratio=0.3) 
 model.save("model.smlm")
 ```
@@ -42,6 +43,55 @@ model.save("model.smlm")
 Result: average error 0.027, fig of model predicted\_y and true\_y
 
 ![X: model predicted y, Y: true y from DFT](.gitbook/assets/fig3.png)
+
+### Validate
+
+```python
+# load trained model
+model = Model.load("soapmlGbrModel_test.smlm")
+# offset a new sample_group, from vasp dir
+validate_vasp_dir_path = ...
+final_ads_energy = ...
+dataset = Dataset.from_vasp_dir_and_energy_list(
+        vasp_dirs=[validate_vasp_dir_path],
+        final_ads_energy=[final_ads_energy],)
+# use model.encode, will encode the same way as dataset \
+# when create Model (the dataset of Model(dataset))
+dataset = model.encode(dataset,center_atom_cases=[8],sample_filter_ratio=0.15)
+model.predict_and_validate(dataset)
+```
+
+### Use
+
+```python
+# load model
+model = Model.load("soapmlGbrModel_test.smlm")
+# use a existing vasp dir, but not offer y
+vasp_dir_index = 5
+dataset = Dataset.from_vasp_dir_and_energy_list(
+        vasp_dirs=[x_file_path[vasp_dir_index]],
+        only_x=True)
+# obtain a slab_structure from exsiting vasp samples  
+slab_structure = dataset.give_a_sample_from_dataset(sample_group_index=0,
+                                                        sample_index=-1,
+                                                        use_repeated=False)
+# use the same box_tensor
+box_tensor = dataset.box_tensor
+# use custom center_position
+center_position = np.array([[0,0,0],[-10,-10,-10],[5,5,5]])
+# make a new dataset for predict
+dataset =Dataset.from_slab_and_center_position(slab_structure=slab_structure,
+                                                   center_position=center_position,
+                                                   box_tensor=box_tensor)
+# encode the same way as dataset in model
+dataset = model.encode(dataset, center_position=center_position)
+print(dataset.datasetx)
+# predict y and output
+pred_y = model.predict(dataset)
+print(pred_y)
+```
+
+### Other Demo - Coming Soon ...
 
 And we can predict the energy in any position, here we predicted OH\* adsorption energy on a plane, where z is equal to the z-coordinate of O atom:
 
@@ -121,7 +171,31 @@ _**When you finished your input, you will get an instance of Dataset as return, 
 
 _**——————————**_
 
-### 4. Dataset.sample\_filter
+### **4.** @static - Dataset.from\_slab\_and\_center\_position
+
+_**\(slab\_structure, center\_position, box\_tensor\)**_
+
+Only need to feed a \(n\_atom, 4\) array as slab\_structure, a \(n\_center\_position, x\) array center\_position and a list of 3x3 \(most possible an one-element list\) array box\_tensor. 
+
+{% hint style="info" %}
+_This input is often used when we want to predict custom position on a slab, the slab\_structure and box\_tensor are often from another dataset._
+{% endhint %}
+
+_**——————————**_
+
+### **5.** Dataset.give\_a\_sample\_from\_dataset
+
+_**\(sample\_group\_index, sample\_index, use\_repeated\)**_
+
+Return a coordinate with shape \(n\_atoms, 4\), if repeated is true, use the structure after apply\_period\(\). The coordinate if from the sample in sample\_group\_index + 1 th element and the sample\_index + 1 th frame.
+
+{% hint style="info" %}
+_This function is often used when you want to predict something, and you need a slab\_structure from existing dataset._
+{% endhint %}
+
+_**——————————**_
+
+### 6. Dataset.sample\_filter
 
 _**\(ratio\)**_
 
@@ -133,7 +207,7 @@ _People often use the sample from a vasp structure optimization process rather t
 
 _**——————————**_
 
-### 5. Dataset.apply\_period
+### 7. Dataset.apply\_period
 
 _**\(direction,repeat\_count\)**_
 
@@ -151,7 +225,7 @@ _**When do we need to apply period? If the position we interested is very closed
 
 _**——————————**_
 
-### 6. Dataset.soap\_encode
+### 8. Dataset.soap\_encode
 
 _**\(center\_atom\_cases, encode\_atom\_cases, n\_max=8, l\_max=8, r\_cut=15.0, absent\_atom\_default\_position, relative\_absent\_position\)**_
 
@@ -189,7 +263,7 @@ Usually we should set the position of absent atom as far away from center positi
 
 _**——————————**_
 
-### 7. Dataset.save
+### 9. Dataset.save
 
 _**\(filename\)**_
 
@@ -197,7 +271,7 @@ Dataset will be saved to soapmlDataset file \(.smld\) using pickle. **It's highl
 
 _**——————————**_
 
-### **8. @static - Dataset.load**
+### **10. @static - Dataset.load**
 
 _**\(filename\)**_
 
@@ -264,22 +338,31 @@ _**And if we choose not to shuffle, we need to decide what is our trainset and w
 
 _**——————————**_
 
-### **4. Model.predict**
+### **4. Model.encode**
 
-{% hint style="danger" %}
-**this part haven't finished yet.**
+_**\(dataset, center\_atom\_cases, center\_position, sample\_filter\_ratio\)**_
 
-\*\*\*\*
-
-* [ ] predict from Dataset
-* [ ] predict from position
-
-\#TODO: give a dataset or coordinate, center position, ... to encode and predict energy
-{% endhint %}
+Encode the input dataset the same way as the dataset in Model.init, and return encoded dataset. You can feed only one of center\_atom\_cases and center\_position.
 
 _**——————————**_
 
-### 5. Model.save
+### 5. Model.predict\_and\_validate
+
+_**\(dataset\)**_
+
+Use the X in encoded dataset to predict Y, plot pred\_y - true\_y and give out error.
+
+_**——————————**_
+
+### 6. Model.predict
+
+_**\(dataset\)**_
+
+Use X encoded dataset to predict and return y.
+
+_**——————————**_
+
+### 7. Model.save
 
 _**\(filename\)**_
 
@@ -287,7 +370,7 @@ Model will be saved to soapmlModel file \(.smlm\) using pickle. Save and keep yo
 
 _**——————————**_
 
-### **6. @static - Model.load**
+### **8. @static - Model.load**
 
 _**\(filename\)**_
 
