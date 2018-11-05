@@ -89,7 +89,12 @@ class Model():
 
     def predict_and_validate(self,dataset):
         x=dataset.datasetx
-        true_y = dataset.datasety
+        try:
+            true_y = dataset.datasety
+            if true_y is None:
+                raise ValueError("No y in dataset, can not validate!")
+        except:
+            raise ValueError("No y in dataset, can not validate!")
         pred_y = self.model.model.predict(x)
 
 
@@ -102,7 +107,12 @@ class Model():
         print("Validate error: ",error)
 
 
-
+    def predict(self,dataset):
+        try:
+            x = dataset.datasetx
+        except:
+            raise ValueError("No data in dataset, please encode")
+        return self.model.model.predict(x)
 
 
 
