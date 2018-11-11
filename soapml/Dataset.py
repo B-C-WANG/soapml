@@ -292,6 +292,58 @@ class Dataset(object):
 
             self.repeated_coord.append(new_c)
 
+    def atom_dependent_soap_encode(self,center_atom_cases,encode_atom_cases,n_max=8,l_max=8,r_cut=15.0,absent_atom_default_position=[10,10,10],relative_absent_position=True):
+        '''
+        every atom of case in center_atom_cases will be encode
+        result:
+        list of dict:
+        list length = num of sample group
+        dict, key : atom cases
+        value: (n_sample, n_atom of case (same as key), feature)
+
+        '''
+
+        self.encode_atom_cases = encode_atom_cases
+        self.n_max = n_max
+        self.l_max = l_max
+        self.r_cut = r_cut
+        self.absent_atom_default_position = absent_atom_default_position
+        self.relative_absent_position = relative_absent_position
+
+        self.soap_transformer = SOAPTransformer(encode_atom_cases=encode_atom_cases, n_max=n_max, l_max=l_max,
+                                                r_cut=r_cut)
+        result  =[]
+        for i in tqdm.trange(len(self.coord)):
+            encode_result = {}
+            for atom_case in center_atom_cases:
+                encode_result[atom_case] = []
+            for j in range(self.coord[i].shape[0]):
+                if self.repeated:
+                    coord_ = self.repeated_coord[i][j,:,:]
+                else:
+                    coord_ = self.coord[i][j,:,:]
+
+
+                for atom_case in center_atom_cases:
+                    center_coord = self.coord[i][j, :, :]
+                    encode_input = center_coord[center_coord[:, 0] == atom_case][:, 1:]
+                    if encode_input.shape[0] == 0: # if no such atom, dict do not add
+                        break
+
+
+                    encode_output = self.soap_transformer.transform(coord_,center_position=encode_input,
+                                                                 periodic=False,
+                                                                 absent_atom_default_position=absent_atom_default_position,
+                                                                 relative_absent_position=relative_absent_position)
+
+                encode_result[atom_case].append(encode_output)
+
+
+            for key in encode_result:
+                encode_result[key] = np.array(encode_result[key])
+        result.append(encode_result)
+        self.datasetx = result
+        self.datasety = self.energy # do not need any transform to y
 
 
     def soap_encode(self,encode_atom_cases,center_atom_cases=None,center_position=None,n_max=8,l_max=8,r_cut=15.0,absent_atom_default_position=[10,10,10],relative_absent_position=True):
