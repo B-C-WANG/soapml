@@ -4,9 +4,19 @@
 
 ## **soapml**
 
+_**This is a Chemist-Friendly tool, just very simple python code to test if this tool is useful to your work, no extra machine learning knowledge is needed.**_
+
 soapml is based on SOAPLite: [https://github.com/SINGROUP/SOAPLite](https://github.com/SINGROUP/SOAPLite)
 
 A machine learning tool for doing regression using SOAP \(smooth overlap of atomic position\) encoded structure of molecules, surface, ... Helps to find relationship between position and energy, activity and other physical chemical property.
+
+### How to install?
+
+1. Test environment is Python3. Anaconda3 is highly recommended
+2. Install SOAPLite: [https://github.com/SINGROUP/SOAPLite](https://github.com/SINGROUP/SOAPLite) , if you can not install it on Windows, use linux.
+3. Install my machine learning tools: [https://github.com/B-C-WANG/MachineLearningTools](https://github.com/B-C-WANG/MachineLearningTools) \(download files and run "python setup.py install"\)
+4. Install my tools for extracting information from Vasp dirs: [https://github.com/B-C-WANG/VDE-VaspDataExtract](https://github.com/B-C-WANG/VDE-VaspDataExtract) \(download files and run "python setup.py install"\)
+5. Install soapml: download files and run "python setup.py install"
 
 ## Demo 
 
