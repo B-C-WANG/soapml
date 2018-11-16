@@ -328,20 +328,34 @@ class Dataset(object):
                     center_coord = self.coord[i][j, :, :]
                     encode_input = center_coord[center_coord[:, 0] == atom_case][:, 1:]
                     if encode_input.shape[0] == 0: # if no such atom, dict do not add
-                        break
+                        encode_output = 0
+                    # the shape[0] should be atom number, even it is 1 atom
+                    else:
 
 
-                    encode_output = self.soap_transformer.transform(coord_,center_position=encode_input,
+                        encode_output = self.soap_transformer.transform(coord_,center_position=encode_input,
                                                                  periodic=False,
                                                                  absent_atom_default_position=absent_atom_default_position,
+
                                                                  relative_absent_position=relative_absent_position)
+
+                    feature_num = encode_output.shape[1]
 
                 encode_result[atom_case].append(encode_output)
 
+                # if some atom not in center_atom_cases, make it zero vector, length == feature_num
+            encode_atoms = list(encode_result.keys())
+            for need_atoms in center_atom_cases:
+                #print(need_atoms,encode_atoms)
 
-            for key in encode_result:
-                encode_result[key] = np.array(encode_result[key])
-        result.append(encode_result)
+
+                encode_result[need_atoms] = np.array(encode_result[need_atoms])
+                if len(encode_result[need_atoms].shape) == 1: # it
+
+                    print("No atom %s, set to zero feature" % need_atoms)
+                    encode_result[need_atoms] = np.zeros(shape=(self.coord[i].shape[0],1,feature_num))
+            result.append(encode_result)
+
         self.datasetx = result
         self.datasety = self.energy # do not need any transform to y
 
