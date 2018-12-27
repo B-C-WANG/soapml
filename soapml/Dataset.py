@@ -72,10 +72,10 @@ class Dataset(object):
 
         '''
         if only_x==False:
-            assert slab_energy != None or final_ads_energy != None, "At least feed one reference energy"
-            if (slab_energy != None and final_ads_energy != None):
+            assert slab_energy is not None or final_ads_energy is not None, "At least feed one reference energy"
+            if (slab_energy is not None and final_ads_energy is not None):
                 raise ValueError("Can only feed one type of energy!")
-            if slab_energy != None:use_slab_energy = True
+            if slab_energy is not None:use_slab_energy = True
             else:use_slab_energy = False
 
         coordinate = []
@@ -358,6 +358,8 @@ class Dataset(object):
 
         self.datasetx = result
         self.datasety = self.energy # do not need any transform to y
+        self.feature_num = feature_num
+
 
 
     def soap_encode(self,encode_atom_cases,center_atom_cases=None,center_position=None,n_max=8,l_max=8,r_cut=15.0,absent_atom_default_position=[10,10,10],relative_absent_position=True):
